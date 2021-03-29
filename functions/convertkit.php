@@ -40,7 +40,8 @@ function ckwc_convertkit_api_request( $path, $query_args = array(), $request_bod
 	}
 
 	$request_url = add_query_arg( $query_args, $request_url );
-	$response    = wp_remote_request( $request_url, $request_args );
+
+	$response = wp_remote_request( $request_url, $request_args );
 
 	if ( is_wp_error( $response ) ) {
 		return $response;

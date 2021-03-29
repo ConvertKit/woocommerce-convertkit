@@ -149,7 +149,7 @@ class CKWC_Integration extends WC_Integration {
 			add_action( 'woocommerce_order_status_changed', array( $this, 'order_status' ), 99999, 3 );
 
 			if ( 'yes' === $this->send_purchases ) {
-				add_action( 'woocommerce_payment_complete', array( $this, 'send_payment' ), 99999, 1 );
+				add_action( 'woocommerce_order_status_changed', array( $this, 'send_payment' ), 99999, 4 );
 				add_action( 'woocommerce_order_status_changed', array( $this, 'handle_cod_or_check_order_completion' ), 99999, 4 );
 			}
 		}
@@ -571,8 +571,9 @@ class CKWC_Integration extends WC_Integration {
 	 * @param WC_Order $order WooCommerce order.
 	 */
 	public function handle_cod_or_check_order_completion( $order_id, $status_old, $status_new, $order ) {
+
 		$api_key_correct = ! empty( $this->api_key );
-		$correct_status  = 'completed' === $status_new;
+		$correct_status  = $status_new === $this->event;
 		$payment_methods = array( 'cod', 'cheque', 'check' );
 
 		if ( 'yes' === $this->send_manual_purchases ) {
@@ -648,7 +649,6 @@ class CKWC_Integration extends WC_Integration {
 	 * @param string $order_id WooCommerce order ID.
 	 */
 	public function process_convertkit_subscriptions( $subscriptions, $email, $name, $order_id ) {
-
 		foreach ( $subscriptions as $subscription_raw ) {
 			list( $subscription['type'], $subscription['id'] ) = explode( ':', $subscription_raw );
 
@@ -785,11 +785,24 @@ class CKWC_Integration extends WC_Integration {
 	 *
 	 * @param int $order_id WooCommerce order ID.
 	 */
-	public function send_payment( $order_id ) {
+	/**
+	 * @param int $order_id
+	 * @param string $status_old
+	 * @param string $status_new
+	 * @param WC_Order $order
+	 */
+	public function send_payment( $order_id, $status_old, $status_new, $order ) {
 		$api_key_correct = ! empty( $this->api_key );
-		$order           = wc_get_order( $order_id );
+		$status_correct  = $status_new === $this->event;
 
-		if ( $api_key_correct && ! is_wp_error( $order ) && $order ) {
+		// When the subscribe event is "Order Created", the "pending" status we are looking for will only last a bit. This line ensures we don't miss it.
+		if ( 'pending' === $this->event && 'pending' === $status_old ) {
+			$status_correct = true;
+		}
+
+		$order = wc_get_order( $order_id );
+
+		if ( $api_key_correct && $status_correct && ! is_wp_error( $order ) && $order ) {
 
 			$products = array();
 
